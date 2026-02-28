@@ -3,7 +3,7 @@ import pypsa
 import matplotlib.pyplot as plt
 
 
-def excel_reader(filename: str) -> pd.DataFrame:
+def excel_reader(filename: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = pd.read_excel(filename, header=8)
     df_settings = pd.read_excel(filename, header=None, nrows=6)
     df["Pmin (MW)"] = pd.to_numeric(df["Pmin (MW)"], errors="coerce").fillna(0)
@@ -18,6 +18,9 @@ def excel_reader(filename: str) -> pd.DataFrame:
 def build_network() -> pypsa.Network:
     grid = pypsa.Network()
     grid.add("Carrier", "AC")
+
+    grid.set_snapshots(pd.DatetimeIndex(["2026-01-01 00:00"]))
+
     return grid
 
 def add_buses(grid: pypsa.Network, df: pd.DataFrame) -> None:
@@ -83,8 +86,6 @@ def add_loads(grid: pypsa.Network, df: pd.DataFrame, df_settings: pd.DataFrame) 
                         marginal_cost=VOLL,
                         p_min_pu=0,
                         carrier="AC")
-    
-
 
 def add_lines(grid: pypsa.Network, df: pd.DataFrame) -> None:
     for n in range(df["From"].count()):
@@ -99,8 +100,6 @@ def add_lines(grid: pypsa.Network, df: pd.DataFrame) -> None:
             s_nom=df.loc[n, "Thermal limit (MW)"],
             carrier="AC"
         )
-
-
 
 def solve_opf(grid: pypsa.Network, solver_name="highs") -> None:
     grid.optimize(solver_name=solver_name)
