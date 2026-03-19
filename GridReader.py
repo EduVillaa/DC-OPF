@@ -6,6 +6,7 @@ import networkx as nx
 from pathlib import Path
 from typing import Optional, Dict, Any
 import matplotlib.dates as mdates
+import plotly.graph_objects as go
 
 
 def leerhojas(filename: str) -> dict:
@@ -127,6 +128,7 @@ def add_storage_unit(grid: pypsa.Network, df_StorageUnit: pd.DataFrame) -> None:
                     marginal_cost = df_StorageUnit.loc[n, "marginal_cost (€/MWh)"], #Puede representar degradación y costes operativos
                     carrier = "AC",
                 )
+
             
 def grid_connection(grid: pypsa.Network, df_Grid_connection: pd.DataFrame, df_TS_Energy_Prices: pd.DataFrame, df_SYS_settings: pd.DataFrame) -> None:
      
@@ -186,7 +188,6 @@ def build_network(df_SYS_settings: pd.DataFrame) -> pypsa.Network:
     grid = pypsa.Network()
     grid.add("Carrier", "AC")
     start_date = str(df_SYS_settings.loc[5, "SYSTEM PARAMETERS"])
-    print(start_date)
     time_horizon = str(df_SYS_settings.loc[3, "SYSTEM PARAMETERS"])
     if time_horizon == "Static":
         grid.set_snapshots(pd.DatetimeIndex(["2026-01-01 00:00"]))
@@ -268,8 +269,6 @@ def load_profile_reader(df_TS_LoadProfiles: pd.DataFrame, df_SYS_settings: pd.Da
     elif horizon == "Week":
         df = df_TS_LoadProfiles.loc[start_Date:].iloc[:168]
         return df.loc[:, load_profile_type]
-    
-  
 
 def add_loads(grid: pypsa.Network, df_Net_Loads: pd.DataFrame, df_SYS_settings: pd.DataFrame, df_TS_LoadProfiles: pd.DataFrame) -> None:
     df_Net_Loads["Loss factor (%)"] = pd.to_numeric(df_Net_Loads["Loss factor (%)"], errors="coerce").fillna(0)
@@ -287,7 +286,7 @@ def add_loads(grid: pypsa.Network, df_Net_Loads: pd.DataFrame, df_SYS_settings: 
 
         AnnualConsumption = df_Net_Loads.loc[n, "Annual energy consumption (MWh/year)"]
         load_profile_MW = load_profile_reader(df_TS_LoadProfiles, df_SYS_settings, load_profile_type) * AnnualConsumption
-
+        horizon = df_SYS_settings.loc[3, "SYSTEM PARAMETERS"]
         location = df_Net_Loads.loc[n, "LOAD LOCATION"]
         Pd = df_Net_Loads.loc[n, "Active power demand (MW)"]
         Ploss = df_Net_Loads.loc[n, "Loss factor (%)"]
@@ -297,7 +296,8 @@ def add_loads(grid: pypsa.Network, df_Net_Loads: pd.DataFrame, df_SYS_settings: 
                     bus=f"Bus_node_{location}", 
                     p_set=Pd*(1+Ploss), carrier="AC")
             
-            grid.loads_t.p_set.loc[:, f"Load_node_{location}_L{n}"] = load_profile_MW
+            if horizon == "Day" or horizon == "Week":
+                grid.loads_t.p_set.loc[:, f"Load_node_{location}_L{n}"] = load_profile_MW
             
             use_shed = int(df_SYS_settings.loc[1, "SYSTEM PARAMETERS"]) == 1
             if use_shed:
@@ -406,7 +406,7 @@ def add_renewable_generator(grid: pypsa.Network, df_Gen_Renewable: pd.DataFrame,
 def solve_opf(grid: pypsa.Network, solver_name) -> None:
     grid.optimize(solver_name=solver_name)
 
-def export_results(grid: pypsa.Network)-> None:
+def export_results(grid: pypsa.Network, df_SYS_settings: pd.DataFrame)-> None:
     # Agrupamos todos los pwl de un mismo generador
     cols_base = grid.generators_t.p.columns.str.replace(r'_seg\d+$', '', regex=True)
     dispatch = grid.generators_t.p.T.groupby(cols_base).sum().T
@@ -417,14 +417,10 @@ def export_results(grid: pypsa.Network)-> None:
 
     battery_discharge = grid.storage_units_t.p.clip(lower=0).sum(axis=1) #Agrupamos las descargas de todas las baterías
     battery_charge = grid.storage_units_t.p.clip(upper=0).sum(axis=1) #Agrupamos las cargas de todas las baterías
-
-    print(grid.storage_units_t.p)
     
     dispatch.insert(0, "battery_discharge", battery_discharge) #Incluimos en el dataframe del despacho la descarga de las baterías
     dispatch.insert(1, "battery_charge", battery_charge) #Incluimos en el dataframe del despacho la carga de las baterías
     dispatch["Grid_export"] = -dispatch["Grid_export"] #La exportación de energía a la red la tomamos como negativa
-
-    print(dispatch)
 
 
     # Nos quedamos solo con las columnas agregadas que queremos mostrar
@@ -440,104 +436,251 @@ def export_results(grid: pypsa.Network)-> None:
     # Eliminamos columnas que sean todo ceros o casi todo ceros
     dispatch_clean = dispatch_clean.loc[:, (dispatch_clean.abs() > 1e-6).any()]
 
+    horizon = df_SYS_settings.loc[3, "SYSTEM PARAMETERS"]
     # -----------------------------
-    # GRÁFICO DE DESPACHO ESCALONADO
+    # GRÁFICO DE DESPACHO ESCALONADO SOLO PARA OPF MULTIPERIODO
     # -----------------------------
-    fig, ax = plt.subplots(figsize=(14, 6))
+    if horizon == "Day" or horizon == "Week":
+        fig, ax = plt.subplots(figsize=(14, 6))
 
-    # Orden recomendado
-    pos_cols = ["Dispatch", "PV", "Wind", "battery_discharge", "Grid_import"]
-    neg_cols = ["battery_charge", "Grid_export"]
+        # Orden recomendado
+        pos_cols = ["Dispatch", "PV", "Wind", "battery_discharge", "Grid_import"]
+        neg_cols = ["battery_charge", "Grid_export"]
 
-    # Dejamos solo las que existan realmente
-    pos_cols = [c for c in pos_cols if c in dispatch_clean.columns]
-    neg_cols = [c for c in neg_cols if c in dispatch_clean.columns]
+        # Dejamos solo las que existan realmente
+        pos_cols = [c for c in pos_cols if c in dispatch_clean.columns]
+        neg_cols = [c for c in neg_cols if c in dispatch_clean.columns]
 
-    # Colores
-    colors = {
-        "PV": "#FFD54F",
-        "Wind": "#4FC3F7",
-        "battery_discharge": "#66BB6A",
-        "Dispatch": "#E57373",
-        "Grid_import": "#B0BEC5",
-        "battery_charge": "#5C6BC0",
-        "Grid_export": "#424242"
-    }
+        # Colores
+        colors = {
+            "PV": "#FFD54F",
+            "Wind": "#4FC3F7",
+            "battery_discharge": "#66BB6A",
+            "Dispatch": "#E57373",
+            "Grid_import": "#B0BEC5",
+            "battery_charge": "#5C6BC0",
+            "Grid_export": "#424242"
+        }
 
-    # Apilado positivo
-    base_pos = pd.Series(0.0, index=dispatch_clean.index)
-    for col in pos_cols:
-        y = dispatch_clean[col]
-        ax.fill_between(
-            dispatch_clean.index,
-            base_pos,
-            base_pos + y,
-            step="post",
-            alpha=0.9,
-            label=col,
-            color=colors.get(col, None)
+        # Apilado positivo
+        base_pos = pd.Series(0.0, index=dispatch_clean.index)
+        for col in pos_cols:
+            y = dispatch_clean[col]
+            ax.fill_between(
+                dispatch_clean.index,
+                base_pos,
+                base_pos + y,
+                step="post",
+                alpha=0.9,
+                label=col,
+                color=colors.get(col, None)
+            )
+            ax.step(
+                dispatch_clean.index,
+                base_pos + y,
+                where="post",
+                color=colors.get(col, None),
+                linewidth=1
+            )
+            base_pos = base_pos + y
+
+        # Apilado negativo
+        base_neg = pd.Series(0.0, index=dispatch_clean.index)
+        for col in neg_cols:
+            y = dispatch_clean[col]   # ya es negativo
+            ax.fill_between(
+                dispatch_clean.index,
+                base_neg,
+                base_neg + y,
+                step="post",
+                alpha=0.8,
+                label=col,
+                color=colors.get(col, None)
+            )
+            base_neg = base_neg + y
+
+        # Línea horizontal en cero
+        ax.axhline(0, color="black", linewidth=1)
+
+        # Título y etiquetas
+        ax.set_title("Dispatch")
+        ax.set_ylabel("Power [MW]")
+        ax.set_xlabel("Time")
+
+        # Formato del eje X
+        n_snapshots = len(dispatch_clean)
+
+        if n_snapshots <= 24:
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))# Para un día: cada 2 h
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        elif n_snapshots <= 24 * 7:
+            ax.xaxis.set_major_locator(mdates.DayLocator())
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+            ax.xaxis.set_minor_locator(mdates.HourLocator(interval=12))# Para una semana: cada 12 h suele quedar bien
+            ax.xaxis.set_minor_formatter(mdates.DateFormatter("%Hh"))
+            ax.tick_params(axis="x", which="major", pad=15)
+            ax.tick_params(axis="x", which="minor", pad=3)
+        else:
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+
+        # Leyenda
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
+        plt.subplots_adjust(right=0.8, bottom=0.18)
+        plt.tight_layout()
+
+        # Guardamos figura
+        #plt.savefig("dispatch_plot.png", dpi=300, bbox_inches="tight")
+        #plt.close()
+        #plt.show()
+
+        # -----------------------------
+        # GRÁFICO DE SOC TOTAL SOLO PARA OPF MULTIPERIODO
+        # -----------------------------
+        fig, ax = plt.subplots(figsize=(10,4))
+
+        soc = grid.storage_units_t.state_of_charge.copy()
+        soc_total = soc.sum(axis=1)
+
+        ax.plot(soc_total.index, soc_total.values)
+
+        capacity = (grid.storage_units["p_nom"] * grid.storage_units["max_hours"]).sum()
+        ax.axhline(y=capacity, linestyle="--", color="red", label="Max capacity")
+
+        ax.set_xlabel("Time")
+        ax.set_ylabel("State of charge [MWh]")
+        ax.set_title("Battery SOC")
+        if horizon == "Day":
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        elif horizon =="Week":
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+
+        ax.legend()
+        ax.grid(True, axis="y")
+
+        plt.tight_layout()
+        plt.show()
+        # plt.show()
+
+
+        # -----------------------------
+        # GRÁFICO DE SOC POR BATERÍA SOLO PARA OPF MULTIPERIODO
+        # -----------------------------
+        fig, ax = plt.subplots(figsize=(10,4))
+
+        soc = grid.storage_units_t.state_of_charge.copy()
+
+        for battery in soc.columns:
+            ax.plot(soc.index, soc[battery], label=battery)
+
+        capacities = grid.storage_units["p_nom"] * grid.storage_units["max_hours"]
+
+        for i, battery in enumerate(capacities.index):
+            ax.axhline(
+                y=capacities[battery],
+                linestyle="--",
+                color="gray",
+                alpha=0.6,
+                label="Capacity" if i == 0 else None
+            )
+
+        ax.set_ylabel("State of charge [MWh]")
+        ax.set_title("Battery SOC (per unit)")
+        ax.set_xlabel("Time")
+
+        if horizon == "Day":
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        elif horizon =="Week":
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+
+        ax.legend()
+        ax.grid(True, axis="y")
+
+        plt.tight_layout()
+        plt.show()
+                    
+    # -----------------------------
+    # GRÁFICO DE DESPACHO TIPO SANKEY SOLO PARA OPF ESTÁTICO
+    # -----------------------------
+    if horizon == "Static":
+        pv = dispatch_clean.get("PV", 0)
+        wind = dispatch_clean.get("Wind", 0)
+        grid_import = dispatch_clean.get("Grid_import", 0)
+        battery_discharge = dispatch_clean.get("battery_discharge", 0)
+        dispatch = dispatch_clean.get("Dispatch", 0)
+
+        load = grid.loads_t.p.sum()
+        battery_charge = -dispatch_clean.get("battery_charge", 0)
+        grid_export = -dispatch_clean.get("Grid_export", 0)
+
+        # Comprobación opcional del balance
+        total_in = pv + wind + grid_import + battery_discharge + dispatch
+        total_out = load + battery_charge + grid_export
+
+        print("Total entrada:", total_in)
+        print("Total salida:", total_out)
+
+        # Nodos
+        labels = [
+            "PV",                 # 0
+            "Wind",               # 1
+            "Grid import",        # 2
+            "Battery discharge",  # 3
+            "Dispatch",           # 4
+            "Energy supplied",    # 5
+            "Load",               # 6
+            "Battery charge",     # 7
+            "Grid export"         # 8
+        ]
+
+        # Flujos
+        source = [
+            0, 1, 2, 3, 4,   # entradas -> nodo central
+            5, 5, 5          # nodo central -> salidas
+        ]
+
+        target = [
+            5, 5, 5, 5, 5,
+            6, 7, 8
+        ]
+
+        value = [
+            pv, wind, grid_import, battery_discharge, dispatch,
+            load, battery_charge, grid_export
+        ]
+
+        fig = go.Figure(data=[go.Sankey(
+            arrangement="snap",
+            node=dict(
+                pad=25,
+                thickness=20,
+                line=dict(color="black", width=0.5),
+                label=labels
+            ),
+            link=dict(
+                source=source,
+                target=target,
+                value=value
+            )
+        )])
+
+        fig.update_layout(
+            title=dict(
+                text="Microgrid energy balance",
+                x=0.03,
+                y=0.95
+            ),
+            font=dict(size=16),
+            height=750,
+            margin=dict(l=20, r=20, t=100, b=20)
         )
-        ax.step(
-            dispatch_clean.index,
-            base_pos + y,
-            where="post",
-            color=colors.get(col, None),
-            linewidth=1
-        )
-        base_pos = base_pos + y
 
-    # Apilado negativo
-    base_neg = pd.Series(0.0, index=dispatch_clean.index)
-    for col in neg_cols:
-        y = dispatch_clean[col]   # ya es negativo
-        ax.fill_between(
-            dispatch_clean.index,
-            base_neg,
-            base_neg + y,
-            step="post",
-            alpha=0.8,
-            label=col,
-            color=colors.get(col, None)
-        )
-        base_neg = base_neg + y
-
-    # Línea horizontal en cero
-    ax.axhline(0, color="black", linewidth=1)
-
-    # Título y etiquetas
-    ax.set_title("Dispatch")
-    ax.set_ylabel("Power [MW]")
-    ax.set_xlabel("Time")
-
-    # Formato del eje X
-    # Para un día: cada 2 h
-    # Para una semana: cada 12 h suele quedar bien
-    n_snapshots = len(dispatch_clean)
-
-    if n_snapshots <= 24:
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-    elif n_snapshots <= 24 * 7:
-        ax.xaxis.set_major_locator(mdates.DayLocator())
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
-        ax.xaxis.set_minor_locator(mdates.HourLocator(interval=12))
-        ax.xaxis.set_minor_formatter(mdates.DateFormatter("%Hh"))
-        ax.tick_params(axis="x", which="major", pad=15)
-        ax.tick_params(axis="x", which="minor", pad=3)
-    else:
-        ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
-
-    # Leyenda
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
-    plt.subplots_adjust(right=0.8, bottom=0.18)
-    plt.tight_layout()
-
-    # Guardamos figura
-    #plt.savefig("dispatch_plot.png", dpi=300, bbox_inches="tight")
-    #plt.close()
-    plt.show()
-
+        fig.show()
+    
     # -----------------------------
     # EXPORTACIÓN A EXCEL
     # -----------------------------
@@ -608,9 +751,6 @@ def main():
     grid_connection(grid, df_Grid_connection, df_TS_Energy_Prices, df_SYS_settings)
 
 
-
-    print(grid.loads_t.p_set.head(168))
-
     solver=str(df_SYS_settings.loc[2, "SYSTEM PARAMETERS"])
     solve_opf(grid, solver_name=solver)
 
@@ -621,13 +761,9 @@ def main():
 
     #print(grid.objective)
     
-    export_results(grid)
+    export_results(grid, df_SYS_settings)
 
-    """
-    print(grid.loads_t.p)
-    print(grid.links_t.p0)
-    print(grid.links_t.p1)
-    """
+
 
 
 
