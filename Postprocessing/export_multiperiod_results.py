@@ -11,13 +11,14 @@ import networkx as nx
 from Postprocessing.Graphs.dispatchgraphs import dispatch_graph_resolution_choice
 from Postprocessing.Graphs.SOCgraphs import SOC_graph_resolution_choice
 #from Postprocessing.Graphs.lineflowgraphs import maxloading_graph_resolution_choice, plot_line_loading_percent
-from Postprocessing.Graphs.lineflowgraphs import *
+from Postprocessing.Graphs.lineflowgraphs import maxloading_graph_resolution_choice, plot_line_loading_percent, plot_line_loading_histogram_global, plot_line_loading_histogram_top_lines
 from Postprocessing.Graphs.sankeygraph import plot_energy_balance_sankey
 from Postprocessing.Graphs.renewablegraphs import renewable_graph_resolution_choice
 from Postprocessing.Graphs.renewablesharegraphs import renewableshare_graph_resolution_choice
 from Postprocessing.Graphs.import_export_graphs import GridExportImport_graph_resolution_choice
 from Postprocessing.KPIsoptimized_battery import get_battery_sizes
 from Postprocessing.Graphs.loadgraphs import total_load_graph_resolution_choice
+from Postprocessing.Graphs.pricesgraphs import prices_graph_resolution_choice, nodal_price_histogram
 
 def save_plotly_fig(fig, path, width=1200, height=750, scale=2):
     if fig is None:
@@ -412,6 +413,9 @@ def export_multiperiod_results(grid: pypsa.Network, df_SYS_settings: pd.DataFram
     fig_renewable_share_total = renewableshare_graph_resolution_choice(df_SYS_settings, dispatch_clean, grid)
     fig_grid_topology = drawGrid(grid)
 
+    fig_mean_prices, fig_heatmap = prices_graph_resolution_choice(df_SYS_settings, grid, 2)
+    fig_prices_histogram = nodal_price_histogram(grid, "Multiperiod")
+
     df_bat_optimized_data = get_battery_sizes(grid)
 
     gen_p_renewables = grid.generators_t.p.loc[:, 
@@ -470,6 +474,10 @@ def export_multiperiod_results(grid: pypsa.Network, df_SYS_settings: pd.DataFram
     saved_renewable_share_total = save_fig(fig_renewable_share_total, img_dir / "renewable_share.png")
 
     saved_grid_topology = save_fig(fig_grid_topology, img_dir / "gridtopology.png")
+
+    saved_meanprices = save_fig(fig_mean_prices, img_dir / "meanprices.png")
+    saved_priceheatmap = save_fig(fig_heatmap, img_dir / "priceheatmap.png")
+    saved_price_histogram = save_fig(fig_prices_histogram, img_dir / "pricehistogram.png")
     
     try:
         # Reabrir workbook e insertar imágenes
@@ -621,6 +629,33 @@ def export_multiperiod_results(grid: pypsa.Network, df_SYS_settings: pd.DataFram
                 wb["KPIs"],
                 img_dir / "gridtopology.png",
                 cell="I10",
+                max_width=420*2,
+                max_height=320*2
+            )
+        
+        if saved_meanprices:
+            insert_fig_in_sheet(
+                wb["prices"],
+                img_dir / "meanprices.png",
+                cell="K10",
+                max_width=420*2,
+                max_height=320*2
+            )
+        
+        if saved_price_histogram:
+            insert_fig_in_sheet(
+                wb["prices"],
+                img_dir / "pricehistogram.png",
+                cell="K29",
+                max_width=420*2,
+                max_height=320*2
+            )
+        
+        if saved_priceheatmap:
+            insert_fig_in_sheet(
+                wb["prices"],
+                img_dir / "priceheatmap.png",
+                cell="A10",
                 max_width=420*2,
                 max_height=320*2
             )

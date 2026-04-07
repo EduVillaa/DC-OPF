@@ -96,7 +96,7 @@ def GridExportImport_per_hour_graph(dispatch_clean: pd.DataFrame, horizon: str =
     else:
         interval = max(1, int(n_snapshots / 24 / 14))
         ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d\n%b"))
 
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
     ax.grid(True, axis="y")
@@ -299,7 +299,7 @@ def GridExportImport_weekly_energy_graph(dispatch_clean: pd.DataFrame, horizon: 
 
     if n_weeks <= 12:
         ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d\n%b"))
 
     elif n_weeks <= 52:
         ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=4))

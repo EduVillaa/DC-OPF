@@ -267,7 +267,7 @@ def plot_dispatch_figure_hourly_snapshots(dispatch_clean: pd.DataFrame, horizon:
 
     else:
         ax.xaxis.set_major_locator(mdates.DayLocator(interval=int(1/408*n_snapshots+9/17)))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d\n%b"))
 
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
     fig.tight_layout()

@@ -770,9 +770,6 @@ def maxloading_graph_resolution_choice(df_SYS_settings: pd.DataFrame, grid):
     return fig_heatmap_line_loading, fig_max_line_loading
 
 
-
-
-
 def plot_line_loading_percent(grid, horizon: str = "Multiperiod"):
     """
     Devuelve una figura con el % de carga de cada una de las líneas respecto a su thermal limit.
