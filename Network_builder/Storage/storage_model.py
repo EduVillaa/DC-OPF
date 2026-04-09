@@ -65,8 +65,8 @@ def add_storage_as_store_links(
         df["Rated active power (MW)"], errors="coerce"
     )
 
-    df["Max hours at rated active power (h)"] = pd.to_numeric(
-        df["Max hours at rated active power (h)"], errors="coerce"
+    df["Duration (h)"] = pd.to_numeric(
+        df["Duration (h)"], errors="coerce"
     )
 
     df["Optimize battery (0/1)"] = pd.to_numeric(
@@ -91,7 +91,7 @@ def add_storage_as_store_links(
             continue
 
         p_nom_base = df.loc[n, "Rated active power (MW)"]
-        max_hours = df.loc[n, "Max hours at rated active power (h)"]
+        max_hours = df.loc[n, "Duration (h)"]
 
         if pd.isna(p_nom_base) or pd.isna(max_hours):
             continue

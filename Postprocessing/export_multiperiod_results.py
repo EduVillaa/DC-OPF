@@ -123,7 +123,7 @@ def build_renewable_detailed_df(
     - Total_used
     - Total_curtailment
     """
-
+ 
     # Comprobaciones básicas
     if not df_available_renewable.index.equals(gen_p_renewables.index):
         raise ValueError("Los índices temporales de ambos DataFrames no coinciden.")
@@ -357,17 +357,16 @@ def drawGrid(grid: pypsa.Network, pcc_bus_name: str | None = None):
 
 
 def export_multiperiod_results(grid: pypsa.Network, df_SYS_settings: pd.DataFrame, df_available_renewable: pd.DataFrame) -> None:
-    # Agrupar generadores PWL
-    cols_base = grid.generators_t.p.columns.str.replace(r'_seg\d+$', '', regex=True)
-    dispatch = grid.generators_t.p.T.groupby(cols_base).sum().T
+    
+    dispatch = grid.generators_t.p.copy()
     dispatch["PV"] = dispatch[[c for c in dispatch.columns if "PV" in c]].sum(axis=1)
     dispatch["Wind"] = dispatch[[c for c in dispatch.columns if "Wind" in c]].sum(axis=1)
     dispatch["Dispatch"] = dispatch[[c for c in dispatch.columns if "Dispatch" in c]].sum(axis=1)
     dispatch["shedding"] = dispatch[[c for c in dispatch.columns if "shedding" in c]].sum(axis=1)
-
+    print("ERROR 5")
     charge_cols = [c for c in grid.links_t.p0.columns if c.startswith("BatteryCharge_")]
     discharge_cols = [c for c in grid.links_t.p1.columns if c.startswith("BatteryDischarge_")]
-    
+    print("ERROR 6")
     # lado AC
     battery_charge = grid.links_t.p0[charge_cols].clip(lower=0).sum(axis=1)
     battery_discharge = (-grid.links_t.p1[discharge_cols]).clip(lower=0).sum(axis=1)
@@ -397,45 +396,58 @@ def export_multiperiod_results(grid: pypsa.Network, df_SYS_settings: pd.DataFram
     # Carpeta de imágenes
     img_dir = Path("results_multiperiod_figures")
     img_dir.mkdir(exist_ok=True)
-
+    print("ERROR 7")
     # Generar figuras
     fig_dispatch = dispatch_graph_resolution_choice(df_SYS_settings, dispatch_clean)
+    print("ERROR 7.1")
     fig_soc_total, fig_soc_batteries = SOC_graph_resolution_choice(df_SYS_settings, grid)
     fig_line_heatmap, fig_line_loading = maxloading_graph_resolution_choice(df_SYS_settings, grid)
     fig_max_line_loading = plot_line_loading_percent(grid, "Multiperiod")
     fig_total_loading_histogram = plot_line_loading_histogram_global(grid, "Multiperiod")
     fig_top_lines_loading_histogram = plot_line_loading_histogram_top_lines(grid, "Multiperiod", 3)
+    print("ERROR 7.2")
     fig_sankey, df_sankey = plot_energy_balance_sankey(dispatch_clean, grid, df_available_renewable)
+    print("ERROR 7.3")
     fig_total_load = total_load_graph_resolution_choice(df_SYS_settings, grid)
     fig_export_import = GridExportImport_graph_resolution_choice(df_SYS_settings, dispatch_clean)
+    
     fig_renewable_total, fig_renewable_pv_wind = renewable_graph_resolution_choice(df_SYS_settings, 
                                                                                    dispatch_clean, df_available_renewable)
+    
     fig_renewable_share_total = renewableshare_graph_resolution_choice(df_SYS_settings, dispatch_clean, grid)
     fig_grid_topology = drawGrid(grid)
-
+    print("7.4")
     fig_mean_prices, fig_heatmap = prices_graph_resolution_choice(df_SYS_settings, grid, 2)
+    print("7.4.1")
     fig_prices_histogram = nodal_price_histogram(grid, "Multiperiod")
-
+    print("7.4.2")
     df_bat_optimized_data = get_battery_sizes(grid)
 
+    print(7.5)
     gen_p_renewables = grid.generators_t.p.loc[:, 
     grid.generators_t.p.columns.str.contains("PV|Wind")
     ]
- 
+  
+    print("df_available_renewable")
+    print(df_available_renewable)
+
+    print("gen_p_renewables")
+    print(gen_p_renewables)
 
     df_detailed_renewable = build_renewable_detailed_df(
     df_available_renewable,
     gen_p_renewables
     )   
-
+    print(8.1)
     df_loads = pd.concat(
     [grid.loads_t.p, grid.loads_t.p.sum(axis=1).rename("Total_load")],
     axis=1
 )
-
+    print(8.2)
     # Guardar Excel con tablas
     output_file = "results_multiperiod.xlsx"
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        print(8.3)
         df_sankey.to_excel(writer, sheet_name="KPIs", index=False, header=False, startcol=1)
 
         df_bat_optimized_data.to_excel(
@@ -451,7 +463,7 @@ def export_multiperiod_results(grid: pypsa.Network, df_SYS_settings: pd.DataFram
         grid.lines_t.p0.round(2).to_excel(writer, sheet_name="line flows")
         grid.buses_t.marginal_price.round(2).to_excel(writer, sheet_name="prices")
         df_loads.to_excel(writer, sheet_name="loads")
-
+    print("ERROR 9")
     # Guardar PNGs
     saved_dispatch = save_fig(fig_dispatch, img_dir / "dispatch.png")
     #saved_sankey = save_plotly_fig(fig_sankey, img_dir / "sankey.png")

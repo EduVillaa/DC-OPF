@@ -38,7 +38,6 @@ def meanprices_hourly(
         if col != "PCC" and "battery" not in col.lower()
     ]
 ]
-    print(prices)
     # Estadísticos por instante temporal
     mean_price = prices.mean(axis=1)
     min_price = prices.min(axis=1)
@@ -732,10 +731,11 @@ def prices_graph_resolution_choice(
 def nodal_price_histogram(
     grid,
     horizon: str = "Multiperiod",
-    bins: int = 30
+    max_bins: int = 30
 ):
     """
     Devuelve una figura con el histograma de todos los precios nodales [€/MWh].
+    El número de bins se ajusta automáticamente al rango de los datos.
     """
 
     if horizon != "Multiperiod":
@@ -767,14 +767,48 @@ def nodal_price_histogram(
     if values.empty:
         return None
 
+    vmin = values.min()
+    vmax = values.max()
+    n = len(values)
+
     fig, ax = plt.subplots(figsize=(12, 5))
+
+    # Caso: todos los valores iguales o prácticamente iguales
+    if np.isclose(vmin, vmax, rtol=0, atol=1e-9):
+        ax.bar([vmin], [n], width=0.1 if abs(vmin) > 1e-9 else 0.01)
+        ax.set_title("Histogram of nodal marginal prices (constant value)")
+        ax.set_xlabel("Price [€/MWh]")
+        ax.set_ylabel("Frequency")
+        ax.grid(True, axis="y")
+        fig.tight_layout()
+        return fig
+
+    # Regla de Freedman–Diaconis
+    q75, q25 = values.quantile([0.75, 0.25])
+    iqr = q75 - q25
+
+    if np.isclose(iqr, 0, rtol=0, atol=1e-12):
+        bins = min(max_bins, values.nunique())
+    else:
+        bin_width = 2 * iqr / (n ** (1 / 3))
+
+        if np.isclose(bin_width, 0, rtol=0, atol=1e-12):
+            bins = min(max_bins, values.nunique())
+        else:
+            bins = int(np.ceil((vmax - vmin) / bin_width))
+
+    # Seguridad extra
+    bins = max(1, min(bins, max_bins))
+
+    # Si por cualquier razón el rango es casi nulo, fuerza 1 bin
+    if bins > 1 and np.isclose(vmax - vmin, 0, rtol=0, atol=1e-9):
+        bins = 1
 
     ax.hist(values, bins=bins)
 
     ax.set_title("Histogram of nodal marginal prices")
     ax.set_xlabel("Price [€/MWh]")
     ax.set_ylabel("Frequency")
-
     ax.grid(True, axis="y")
     fig.tight_layout()
 

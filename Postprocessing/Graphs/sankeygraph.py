@@ -145,7 +145,7 @@ def plot_energy_balance_sankey(dispatch_clean, grid, df_available_renewable):
         round(available_total, 2),
         round(pv+wind, 2),
         round(available_total-pv-wind, 2),
-        round((available_total-pv-wind)/available_total, 2)
+        f"{round((available_total-pv-wind)/available_total*100, 2)} %",
 
     ]
     })

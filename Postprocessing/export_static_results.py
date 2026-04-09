@@ -346,10 +346,7 @@ def drawGrid(grid: pypsa.Network, pcc_bus_name: str | None = None):
     return fig
 
 def build_dispatch_clean_static(grid: pypsa.Network) -> pd.DataFrame:
-    dispatch_raw = grid.generators_t.p.copy()
-
-    cols_base = dispatch_raw.columns.str.replace(r"_seg\d+$", "", regex=True)
-    dispatch = dispatch_raw.T.groupby(cols_base).sum().T
+    dispatch = grid.generators_t.p.copy()
 
     if any("PV" in c for c in dispatch.columns):
         dispatch["PV"] = dispatch[[c for c in dispatch.columns if "PV" in c]].sum(axis=1)

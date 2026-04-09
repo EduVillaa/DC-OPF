@@ -29,8 +29,8 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("DC OPF ")
-        self.resize(650, 420)
+        self.setWindowTitle("DC OPF")
+        self.resize(650, 380)
 
         self.input_path = None
         self.worker = None
@@ -50,16 +50,6 @@ class MainWindow(QWidget):
         self.horizon_combo.addItems(["Static", "Multiperiod"])
         self.horizon_combo.setCurrentText("Multiperiod")
 
-        self.region_combo = QComboBox()
-        self.region_combo.addItems([
-            "Andalucía", "Aragón", "Asturias", "Baleares", "Canarias",
-            "Cantabria", "Castilla-La Mancha", "Castilla y León",
-            "Cataluña", "Ceuta", "Comunidad Valenciana", "Extremadura",
-            "Galicia", "La Rioja", "Madrid", "Melilla", "Murcia",
-            "Navarra", "País Vasco"
-        ])
-        self.region_combo.setCurrentText("Andalucía")
-        
         self.min_start_date = QDate(2022, 1, 1)
         self.max_end_date = QDate(2024, 12, 31)
 
@@ -72,8 +62,8 @@ class MainWindow(QWidget):
 
         self.duration_input = QSpinBox()
         self.duration_input.setRange(1, 3650)
-        self.duration_input.setValue(14)
-        self.duration_input.setSuffix(" días")
+        self.duration_input.setValue(1)
+        self.duration_input.setSuffix(" days")
 
         self.resolution_combo = QComboBox()
         self.resolution_combo.addItems(["Auto", "Hourly", "Daily", "Weekly"])
@@ -84,7 +74,6 @@ class MainWindow(QWidget):
         form_layout = QFormLayout()
         form_layout.addRow("VOLL", self.voll_input)
         form_layout.addRow("Static / Multiperiod", self.horizon_combo)
-        form_layout.addRow("Region", self.region_combo)
         form_layout.addRow("Start date", self.start_date_edit)
         form_layout.addRow("Simulation duration", self.duration_input)
         form_layout.addRow("End date", self.end_date_label)
@@ -126,7 +115,6 @@ class MainWindow(QWidget):
         return {
             "VOLL (€/MWh)": self.voll_input.value(),
             "Static / Multiperiod": self.horizon_combo.currentText(),
-            "Region": self.region_combo.currentText(),
             "Start date (dd/mm/aaaa)": self.start_date_edit.date().toPython(),
             "Simulation duration (days)": self.duration_input.value(),
             "Graph resolution": self.resolution_combo.currentText(),
@@ -160,12 +148,10 @@ class MainWindow(QWidget):
         self.status.setText("Estado: error")
         self.btn_run.setEnabled(True)
         QMessageBox.critical(self, "Error", f"Ha ocurrido un error:\n\n{error_msg}")
-    
+
     def update_duration_limit(self):
         start_date = self.start_date_edit.date()
-        max_end_date = self.max_end_date
-
-        max_days = start_date.daysTo(max_end_date) + 1
+        max_days = start_date.daysTo(self.max_end_date) + 1
 
         self.duration_input.setMaximum(max_days)
 
@@ -177,7 +163,7 @@ class MainWindow(QWidget):
         duration_days = self.duration_input.value()
         end_date = start_date.addDays(duration_days - 1)
         self.end_date_label.setText(end_date.toString("dd/MM/yyyy"))
-    
+
     def validate_simulation_dates(self) -> tuple[bool, str]:
         start_date = self.start_date_edit.date()
         duration_days = self.duration_input.value()
@@ -190,6 +176,7 @@ class MainWindow(QWidget):
             return False, "La fecha final de la simulación no puede superar el 31/12/2024."
 
         return True, ""
+
 
 if __name__ == "__main__":
     app = QApplication([])

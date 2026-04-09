@@ -100,7 +100,6 @@ def build_sys_settings_from_gui(gui_params: dict) -> pd.DataFrame:
     required_keys = [
         "VOLL (€/MWh)",
         "Static / Multiperiod",
-        "Region",
         "Start date (dd/mm/aaaa)",
         "Simulation duration (days)",
         "Graph resolution",
@@ -114,7 +113,6 @@ def build_sys_settings_from_gui(gui_params: dict) -> pd.DataFrame:
         "SYSTEM PARAMETERS": pd.Series({
             "VOLL (€/MWh)": float(gui_params["VOLL (€/MWh)"]),
             "Static / Multiperiod": gui_params["Static / Multiperiod"],
-            "Region": gui_params["Region"],
             "Start date (dd/mm/aaaa)": pd.to_datetime(gui_params["Start date (dd/mm/aaaa)"]),
             "Simulation duration (days)": int(gui_params["Simulation duration (days)"]),
             "Graph resolution": gui_params["Graph resolution"],
@@ -194,33 +192,55 @@ def run_program(
     add_lines(grid, df_Net_Lines)
     add_loads(grid, df_Net_Loads, df_SYS_settings, df_TS_LoadProfiles)
     add_dispatchable_generators(grid, df_Gen_Dispatchable)
+    print(grid.generators[["bus", "p_nom", "marginal_cost", "marginal_cost_quadratic"]])
+    add_renewable_generator(grid, df_Gen_Renewable, df_SYS_settings, df_TS_Wind_Profiles, df_TS_PV_Profiles)
+    print("ERROR 1")
+    print(grid.generators.loc[grid.generators.index.str.contains("PV|Wind"), ["p_nom", "marginal_cost", "carrier"]])
 
-    df_available_renewable = add_renewable_generator(
-        grid,
-        df_Gen_Renewable,
-        df_SYS_settings,
-        df_TS_Wind_Profiles,
-        df_TS_PV_Profiles
-    )
-
+    print(grid.generators_t.p_max_pu.loc[:, grid.generators_t.p_max_pu.columns.str.contains("PV|Wind")])
     grid_connection(grid, df_Grid_connection, df_TS_Energy_Prices, df_SYS_settings)
 
     solver = "highs"
     battery_specs = add_storage_as_store_links(grid, df_StorageUnit)
+    print("\n=== ALL GENERATORS STATIC DATA ===")
+    print(
+    grid.generators[
+        ["bus", "carrier", "p_nom", "p_min_pu", "marginal_cost", "marginal_cost_quadratic"]
+    ].sort_values("marginal_cost")
+    )
     solve_opf(grid, solver, battery_specs)
+    cols = [c for c in ["PV2_0", "PV3_1", "DispatchGen1_0", "DispatchGen3_1", "Grid_import", "Grid_export"] if c in grid.generators_t.p.columns]
 
+    print("\n=== DISPATCH ===")
+    print(grid.generators_t.p[cols].round(3))
+
+    print("\n=== LOAD TOTAL ===")
+    print(grid.loads_t.p.sum(axis=1).round(3))
+
+    print("\n=== NODAL PRICES ===")
+    print(grid.buses_t.marginal_price.round(3))
+    print("\n=== PCC / IMPORT / EXPORT GENERATORS ===")
+    print(
+        grid.generators.loc[
+            grid.generators.index.str.contains("Grid|PCC|Import|Export", case=False, regex=True),
+            ["bus", "carrier", "p_nom", "marginal_cost", "marginal_cost_quadratic"]
+        ]
+    )
+    print("ERROR 2")
     params = df_SYS_settings["SYSTEM PARAMETERS"]
     horizon = params["Static / Multiperiod"]
-
+    print("ERROR 3")
     if horizon == "Multiperiod":
+        df_available_renewable = build_available_renewable_df(df_Gen_Renewable, df_SYS_settings, df_TS_Wind_Profiles, df_TS_PV_Profiles)
         export_multiperiod_results(grid, df_SYS_settings, df_available_renewable)
     elif horizon == "Static":
         export_static_results(grid)
     else:
         raise ValueError(f"Valor de horizonte no reconocido: {horizon}")
 
+    print("ERROR 4")
     return input_path
-
+    
 
 def main_cli():
     used_file = run_program()
