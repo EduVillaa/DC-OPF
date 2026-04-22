@@ -28,7 +28,7 @@ def add_loads(
             )
 
         annual_consumption = df_Net_Loads.loc[n, "Annual energy consumption (MWh/year)"]
-        location = df_Net_Loads.loc[n, "LOAD LOCATION"]
+        location = str(df_Net_Loads.loc[n, "LOAD LOCATION"])
         Pd = df_Net_Loads.loc[n, "Active power demand (MW)"]
 
         if pd.notna(Pd):
@@ -37,7 +37,7 @@ def add_loads(
             grid.add(
                 "Load",
                 load_name,
-                bus=f"Bus_node_{location}",
+                bus=f"Bus.{location}",
                 p_set=Pd,
                 carrier="AC"
             )
@@ -54,7 +54,7 @@ def add_loads(
                 grid.add(
                     "Generator",
                     f"shedding_gen_node_{location}",
-                    bus=f"Bus_node_{location}",
+                    bus=f"Bus.{location}",
                     p_nom=1e6,
                     marginal_cost=VOLL,
                     p_min_pu=0,

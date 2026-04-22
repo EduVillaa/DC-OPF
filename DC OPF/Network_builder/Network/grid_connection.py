@@ -20,7 +20,7 @@ def grid_connection(grid: pypsa.Network, df_Grid_connection: pd.DataFrame, df_TS
             "Line",
             f"LPCC{int(df_Grid_connection.loc[n, 'Bus'])}",
             bus0="PCC",
-            bus1=f"Bus_node_{int(df_Grid_connection.loc[n, 'Bus'])}",
+            bus1=f"Bus.{str(df_Grid_connection.loc[n, 'Bus'])}",
             x=df_Grid_connection.loc[n, "Reactance (p.u)"],
             r=1e-6,
             s_nom=df_Grid_connection.loc[n, "Thermal limit (MW)"],

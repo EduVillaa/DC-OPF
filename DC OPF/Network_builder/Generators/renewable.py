@@ -64,10 +64,10 @@ def add_renewable_generator(
 )-> None:
 
     for n in range(df_Gen_Renewable["GENERATOR LOCATION"].count()):
-        location = int(df_Gen_Renewable.loc[n, "GENERATOR LOCATION"])
+        location = str(df_Gen_Renewable.loc[n, "GENERATOR LOCATION"])
 
         if pd.notna(location):
-            p_nom = df_Gen_Renewable.loc[n, "Rated active power (MW)"]
+            p_nom = df_Gen_Renewable.loc[n, "Rated active power (normalized)"]
 
             if df_Gen_Renewable.loc[n, "Renewable Type"] == "PV":
                 gen_name = f"PV{location}_{n}"
@@ -75,7 +75,7 @@ def add_renewable_generator(
                 grid.add(
                     "Generator",
                     gen_name,
-                    bus=f"Bus_node_{location}",
+                    bus=f"Bus.{location}",
                     p_nom=p_nom,
                     p_min_pu=0,
                     marginal_cost=0,
@@ -91,7 +91,7 @@ def add_renewable_generator(
                 grid.add(
                     "Generator",
                     gen_name,
-                    bus=f"Bus_node_{location}",
+                    bus=f"Bus.{location}",
                     p_nom=p_nom,
                     p_min_pu=0,
                     marginal_cost=0,
@@ -145,7 +145,7 @@ def build_available_renewable_df(
             continue
 
         region = df_Gen_Renewable.loc[n, "Region"]
-        p_nom = df_Gen_Renewable.loc[n, "Rated active power (MW)"]
+        p_nom = df_Gen_Renewable.loc[n, "Rated active power (normalized)"]
         tech = df_Gen_Renewable.loc[n, "Renewable Type"]
 
         if pd.isna(region) or pd.isna(p_nom) or pd.isna(tech):

@@ -45,14 +45,12 @@ def add_dispatchable_generators(
     df["€/MWh"] = df["€/MWh"].fillna(0.0)
 
     for n in range(len(df)):
-        Pmax = df.loc[n, "Rated active power (MW)"]
-        location = df.loc[n, "GENERATOR LOCATION"]
+        Pmax = float(df.loc[n, "Rated active power (MW)"])
+        location = str(df.loc[n, "GENERATOR LOCATION"])
 
         if pd.isna(Pmax) or pd.isna(location) or Pmax <= 0:
             continue
-
-        Pmax = float(Pmax)
-        location = int(location)
+    
 
         Pmin = float(df.loc[n, "Pmin (MW)"])
         marginal_cost = float(df.loc[n, "€/MWh"])
@@ -140,7 +138,7 @@ def add_dispatchable_generators(
         grid.add(
             "Generator",
             f"DispatchGen{location}_{n}",
-            bus=f"Bus_node_{location}",
+            bus=f"Bus.{location}",
             p_nom=Pmax,
             p_min_pu=p_min_pu,
             p_max_pu=1.0,

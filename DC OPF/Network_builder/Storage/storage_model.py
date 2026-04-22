@@ -87,7 +87,7 @@ def add_storage_as_store_links(
     # Crear componentes
     # -----------------------------
     for n in range(len(df)):
-        location = df.loc[n, "LOCATION"]
+        location = str(df.loc[n, "LOCATION"])
 
         if pd.isna(location):
             continue
@@ -104,8 +104,7 @@ def add_storage_as_store_links(
         p_nom_base = df.loc[n, "Rated active power (MW)"]
         e_nom_base = df.loc[n, "Capacity (MWh)"]
 
-        print(f"Row {n} - location={location}")
-        print(f"p_nom_base={p_nom_base}, e_nom_base={e_nom_base}, mode={optimization_mode}")
+   
 
         # -----------------------------
         # Validaciones según modo
@@ -145,7 +144,7 @@ def add_storage_as_store_links(
         else:
             e_initial = 0.0
 
-        ac_bus = f"Bus_node_{location}"
+        ac_bus = f"Bus.{location}"
         bat_bus = f"Bus_battery_{location}_{n}"
 
         store_name = f"BatteryStore_{location}_{n}"
