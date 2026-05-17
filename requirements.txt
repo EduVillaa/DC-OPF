@@ -80,3 +80,4 @@ validators==0.35.0
 xarray==2026.2.0
 zipp==3.23.0
 cartopy==0.25.0
+gurobipy==13.0.2
